@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de Localidades - Vista Compartida</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #2196F3 0%, #21CBF3 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 100%;
+            height: 100vh;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1976D2 0%, #1565C0 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        .stats-bar {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .map-container {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #2196F3;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .map-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            min-width: 120px;
+        }
+
+        .map-btn:hover {
+            background: white;
+            transform: scale(1.05);
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .legend h4 {
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            margin-right: 8px;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1000;
+            background: #e74c3c;
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 400px;
+        }
+
+        .data-source {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+            backdrop-filter: blur(10px);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .stats-bar {
+                gap: 20px;
+            }
+
+            .legend {
+                position: relative;
+                margin: 10px;
+                bottom: auto;
+                left: auto;
+            }
+
+            .map-controls {
+                position: relative;
+                top: auto;
+                right: auto;
+                flex-direction: row;
+                justify-content: center;
+                margin: 10px;
+            }
+
+            .data-source {
+                position: relative;
+                top: auto;
+                left: auto;
+                margin: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ Mapa de Localidades</h1>
+            <p id="mapTitle">Cargando datos del mapa...</p>
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <span class="stat-number" id="totalRecords">-</span>
+                    <span class="stat-label">Localidades</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="totalProvinces">-</span>
+                    <span class="stat-label">Provincias</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-number" id="totalPopulation">-</span>
+                    <span class="stat-label">Población Total</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p><strong>Cargando mapa...</strong></p>
+                <p id="loadingStatus">Inicializando...</p>
+            </div>
+
+            <div class="data-source">
+                📊 <span id="dataSource">Fuente de datos</span>
+            </div>
+
+            <div id="map"></div>
+            
+            <div class="map-controls">
+                <button class="map-btn" onclick="centerMap()" title="Centrar vista">🎯 Centrar</button>
+                <button class="map-btn" onclick="changeMarkerStyle()" title="Cambiar estilo">🎨 Estilo</button>
+                <button class="map-btn" onclick="showInfo()" title="Información">ℹ️ Info</button>
+                <button class="map-btn" onclick="exportCurrentView()" title="Exportar vista">💾 Exportar</button>
+            </div>
+            
+            <div class="legend">
+                <h4>📍 Leyenda</h4>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #e74c3c;"></div>
+                    <span>< 50,000 hab.</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #f39c12;"></div>
+                    <span>50,000 - 100,000</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background-color: #2ecc71;"></div>
+                    <span>> 100,000 hab.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <script>
+        let map;
+        let markers = [];
+        let mapData = [];
+        let currentMarkerStyle = 1;
+
+        // Configuración de fuentes de datos
+        const DATA_SOURCES = {
+            // Ejemplo de cómo configurar diferentes fuentes de datos
+            'default': {
+                url: 'data/localidades.json', // Archivo local
+                title: 'Localidades de Argentina',
+                description: 'Mapa interactivo con localidades argentinas'
+            },
+            'external': {
+                url: 'https://raw.githubusercontent.com/usuario/repo/main/localidades.json', // GitHub
+                title: 'Datos externos',
+                description: 'Datos cargados desde repositorio externo'
+            }
+        };
+
+        // Datos de ejemplo embebidos (por si no hay archivo externo)
+        const SAMPLE_DATA = [
+            {
+                "id": "001",
+                "localidad": "Buenos Aires",
+                "provincia": "Buenos Aires",
+                "poblacion": 2890000,
+                "plan": "Plan Nacional",
+                "latitud": -34.6037,
+                "longitud": -58.3816
+            },
+            {
+                "id": "002",
+                "localidad": "Córdoba",
+                "provincia": "Córdoba",
+                "poblacion": 1330000,
+                "plan": "Plan Regional",
+                "latitud": -31.4201,
+                "longitud": -64.1888
+            },
+            {
+                "id": "003",
+                "localidad": "Rosario",
+                "provincia": "Santa Fe",
+                "poblacion": 948000,
+                "plan": "Plan Provincial",
+                "latitud": -32.9442,
+                "longitud": -60.6505
+            },
+            {
+                "id": "004",
+                "localidad": "Mendoza",
+                "provincia": "Mendoza",
+                "poblacion": 115000,
+                "plan": "Plan Local",
+                "latitud": -32.8895,
+                "longitud": -68.8458
+            },
+            {
+                "id": "005",
+                "localidad": "La Plata",
+                "provincia": "Buenos Aires",
+                "poblacion": 65000,
+                "plan": "Plan Regional",
+                "latitud": -34.9215,
+                "longitud": -57.9545
+            }
+        ];
+
+        // Inicializar aplicación
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+        });
+
+        async function initializeApp() {
+            updateLoadingStatus('Inicializando mapa...');
+            initBaseMap();
+            
+            updateLoadingStatus('Cargando datos...');
+            await loadMapData();
+            
+            updateLoadingStatus('Creando marcadores...');
+            await createAllMarkers();
+            
+            updateLoadingStatus('Finalizando...');
+            finalizeMap();
+        }
+
+        function initBaseMap() {
+            map = L.map('map').setView([-38.416097, -63.616672], 6);
+
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            });
+
+            const cartoLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                attribution: '© OpenStreetMap contributors, © CARTO',
+                maxZoom: 19
+            });
+
+            const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri, DigitalGlobe, GeoEye'
+            });
+
+            osmLayer.addTo(map);
+
+            const baseMaps = {
+                "🗺️ OpenStreetMap": osmLayer,
+                "🎨 Carto Light": cartoLayer,
+                "🛰️ Satélite": satelliteLayer
+            };
+
+            L.control.layers(baseMaps).addTo(map);
+            L.control.scale().addTo(map);
+        }
+
+        async function loadMapData() {
+            try {
+                // Intentar cargar desde diferentes fuentes
+                const urlParams = new URLSearchParams(window.location.search);
+                const dataSource = urlParams.get('data') || 'default';
+                
+                let dataUrl = DATA_SOURCES[dataSource]?.url;
+                
+                if (dataUrl) {
+                    try {
+                        const response = await fetch(dataUrl);
+                        if (response.ok) {
+                            mapData = await response.json();
+                            updateDataSource(DATA_SOURCES[dataSource].title);
+                            document.getElementById('mapTitle').textContent = DATA_SOURCES[dataSource].description;
+                        } else {
+                            throw new Error('No se pudo cargar el archivo');
+                        }
+                    } catch (error) {
+                        console.log('Error cargando datos externos, usando datos de ejemplo');
+                        mapData = SAMPLE_DATA;
+                        updateDataSource('Datos de ejemplo');
+                        document.getElementById('mapTitle').textContent = 'Mapa de ejemplo con principales ciudades argentinas';
+                    }
+                } else {
+                    mapData = SAMPLE_DATA;
+                    updateDataSource('Datos de ejemplo');
+                    document.getElementById('mapTitle').textContent = 'Mapa de ejemplo con principales ciudades argentinas';
+                }
+
+                // Calcular estadísticas
+                const provinces = new Set(mapData.map(item => item.provincia));
+                const totalPopulation = mapData.reduce((sum, item) => sum + (item.poblacion || 0), 0);
+
+                // Actualizar estadísticas
+                document.getElementById('totalRecords').textContent = mapData.length;
+                document.getElementById('totalProvinces').textContent = provinces.size;
+                document.getElementById('totalPopulation').textContent = totalPopulation.toLocaleString();
+
+            } catch (error) {
+                console.error('Error cargando datos:', error);
+                showError('Error al cargar los datos del mapa. Mostrando datos de ejemplo.');
+                mapData = SAMPLE_DATA;
+            }
+        }
+
+        async function createAllMarkers() {
+            const totalRecords = mapData.length;
+            
+            for (let i = 0; i < totalRecords; i++) {
+                const record = mapData[i];
+                if (record.latitud && record.longitud) {
+                    createMarker(record, i);
+                }
+                
+                // Actualizar progreso cada 10 marcadores
+                if (i % 10 === 0) {
+                    const progress = Math.round((i / totalRecords) * 100);
+                    updateLoadingStatus(`Creando marcadores... ${progress}%`);
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+            }
+        }
+
+        function createMarker(record, index) {
+            const position = [record.latitud, record.longitud];
+            
+            let markerColor = '#e74c3c';
+            let markerSize = 8;
+            let markerIcon = '🏘️';
+            
+            if (record.poblacion > 100000) {
+                markerColor = '#2ecc71';
+                markerSize = 12;
+                markerIcon = '🏙️';
+            } else if (record.poblacion > 50000) {
+                markerColor = '#f39c12';
+                markerSize = 10;
+                markerIcon = '🏢';
+            }
+
+            let marker;
+
+            switch (currentMarkerStyle) {
+                case 1: // Iconos personalizados
+                    const customIcon = L.divIcon({
+                        html: `<div style="
+                            background-color: ${markerColor}; 
+                            color: white; 
+                            border-radius: 50%; 
+                            width: ${markerSize * 2}px; 
+                            height: ${markerSize * 2}px; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            font-size: ${markerSize}px;
+                            border: 3px solid white;
+                            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                            font-weight: bold;
+                        ">${markerIcon}</div>`,
+                        className: 'custom-div-icon',
+                        iconSize: [markerSize * 2, markerSize * 2],
+                        iconAnchor: [markerSize, markerSize]
+                    });
+                    marker = L.marker(position, { icon: customIcon });
+                    break;
+
+                case 2: // Circle markers
+                    marker = L.circleMarker(position, {
+                        radius: markerSize,
+                        fillColor: markerColor,
+                        color: '#ffffff',
+                        weight: 3,
+                        opacity: 1,
+                        fillOpacity: 0.9
+                    });
+                    break;
+
+                case 3: // Standard markers
+                default:
+                    marker = L.marker(position);
+                    break;
+            }
+
+            // Popup content
+            const popupContent = `
+                <div style="font-family: Arial, sans-serif; max-width: 280px;">
+                    <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid ${markerColor}; padding-bottom: 8px;">
+                        📍 ${record.localidad}
+                    </h3>
+                    <div style="display: grid; gap: 8px; font-size: 14px;">
+                        <div><span style="color: #3498db;">🏛️</span> <strong>Provincia:</strong> ${record.provincia}</div>
+                        <div><span style="color: #e67e22;">👥</span> <strong>Población:</strong> ${record.poblacion?.toLocaleString() || 'N/A'}</div>
+                        <div><span style="color: #9b59b6;">📋</span> <strong>Plan:</strong> ${record.plan || 'N/A'}</div>
+                        <div><span style="color: #34495e;">🆔</span> <strong>ID:</strong> ${record.id}</div>
+                        <div><span style="color: #27ae60;">🌍</span> <strong>Coords:</strong> ${record.latitud.toFixed(4)}, ${record.longitud.toFixed(4)}</div>
+                    </div>
+                </div>
+            `;
+
+            marker.bindPopup(popupContent, {
+                maxWidth: 300,
+                className: 'custom-popup'
+            });
+
+            marker.addTo(map);
+            markers.push(marker);
+        }
+
+        function finalizeMap() {
+            // Ajustar vista del mapa
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+
+            // Ocultar loading
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function updateLoadingStatus(status) {
+            document.getElementById('loadingStatus').textContent = status;
+        }
+
+        function updateDataSource(source) {
+            document.getElementById('dataSource').textContent = source;
+        }
+
+        function centerMap() {
+            if (markers.length > 0) {
+                const group = new L.featureGroup(markers);
+                map.fitBounds(group.getBounds().pad(0.1));
+            }
+        }
+
+        function changeMarkerStyle() {
+            currentMarkerStyle = currentMarkerStyle === 3 ? 1 : currentMarkerStyle + 1;
+            const styleNames = ['', 'Iconos Personalizados', 'Círculos', 'Marcadores Estándar'];
+            
+            // Limpiar marcadores existentes
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+            
+            // Recrear con nuevo estilo
+            mapData.forEach((record, index) => {
+                if (record.latitud && record.longitud) {
+                    createMarker(record, index);
+                }
+            });
+
+            showNotification(`Estilo: ${styleNames[currentMarkerStyle]}`);
+        }
+
+        function showInfo() {
+            const infoContent = `
+                📊 INFORMACIÓN DEL MAPA
+                
+                • Total de localidades: ${mapData.length}
+                • Provincias representadas: ${new Set(mapData.map(item => item.provincia)).size}
+                • Población total: ${mapData.reduce((sum, item) => sum + (item.poblacion || 0), 0).toLocaleString()}
+                
+                🎨 CONTROLES:
+                • Cambiar estilo de marcadores
+                • Centrar vista en todas las localidades
+                • Exportar datos actuales
+                
+                🗺️ NAVEGACIÓN:
+                • Zoom: Rueda del mouse o botones +/-
+                • Mover: Arrastrar con el mouse
+                • Información: Click en cualquier marcador
+            `;
+
+            showModal('Información del Mapa', infoContent);
+        }
+
+        function exportCurrentView() {
+            const bounds = map.getBounds();
+            const visibleMarkers = markers.filter(marker => {
+                const pos = marker.getLatLng();
+                return bounds.contains(pos);
+            });
+
+            const exportData = {
+                metadata: {
+                    exported: new Date().toISOString(),
+                    totalMarkers: markers.length,
+                    visibleMarkers: visibleMarkers.length,
+                    bounds: {
+                        north: bounds.getNorth(),
+                        south: bounds.getSouth(),
+                        east: bounds.getEast(),
+                        west: bounds.getWest()
+                    },
+                    zoom: map.getZoom(),
+                    center: map.getCenter()
+                },
+                data: mapData
+            };
+
+            const jsonData = JSON.stringify(exportData, null, 2);
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'mapa_localidades_export.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showNotification('📁 Datos exportados correctamente');
+        }
+
+        function showNotification(message) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed; top: 20px; right: 20px; z-index: 2000;
+                background: rgba(33, 150, 243, 0.9); color: white; padding: 15px 25px;
+                border-radius: 25px; font-weight: bold; backdrop-filter: blur(10px);
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2); animation: slideIn 0.3s ease;
+            `;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => notification.remove(), 3000);
+        }
+
+        function showModal(title, content) {
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                background: rgba(0,0,0,0.8); z-index: 3000; display: flex;
+                align-items: center; justify-content: center; padding: 20px;
+            `;
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white; padding: 30px; border-radius: 15px;
+                max-width: 500px; width: 100%; position: relative;
+                font-family: 'Courier New', monospace; white-space: pre-line;
+            `;
+
+            const closeBtn = document.createElement('button');
+            closeBtn.textContent = '✖';
+            closeBtn.style.cssText = `
+                position: absolute; top: 15px; right: 15px;
+                background: #e74c3c; color: white; border: none;
+                padding: 10px; border-radius: 50%; cursor: pointer;
+                width: 35px; height: 35px; font-size: 14px;
+            `;
+            closeBtn.onclick = () => modal.remove();
+
+            modalContent.innerHTML = `<h2 style="margin-bottom: 20px; color: #2c3e50;">${title}</h2><div>${content}</div>`;
+            modalContent.appendChild(closeBtn);
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            modal.onclick = (e) => {
+                if (e.target === modal) modal.remove();
+            };
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `<strong>⚠️ Error:</strong> ${message}`;
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        // Estilos adicionales para popups
+        const style = document.createElement('style');
+        style.textContent = `
+            .custom-popup .leaflet-popup-content-wrapper {
+                border-radius: 15px;
+                box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            }
+            .custom-popup .leaflet-popup-tip {
+                background: white;
+            }
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
